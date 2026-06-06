@@ -8,10 +8,10 @@ import logging
 from io import BytesIO
 
 from utils.task_queue import (
-    get_pending_tasks, mark_task_processing, mark_task_completed, 
-    mark_task_failed, reset_processing_to_pending
+    get_pending_tasks, mark_task_processing, mark_task_completed,
+    mark_task_failed
 )
-from utils.db_utils import get_balance, decrease_balance
+from utils.db_utils import get_balance, decrease_balance, increase_balance
 from utils.constants import BOT_SIGNATURE
 from utils.image_hosting import upload_image  # <--- Добавлен импорт
 
@@ -26,15 +26,17 @@ async def process_task(bot, task: dict):
     task_type = task['task_type']
     
     logger.info(f"[TaskProcessor] Processing task {task_id}: {task_type} for user {user_id}")
-    
+
     # Помечаем как выполняющуюся
     mark_task_processing(task_id)
-    
+
+    cost = task['cost'] or 1
+    charged = False  # Списали ли баланс — нужно для гарантированного возврата при ошибке
+
     try:
         # Проверяем баланс
-        cost = task['cost'] or 1
         balance = get_balance(user_id)
-        
+
         if balance < cost:
             mark_task_failed(task_id, "Недостаточно генераций")
             bot.send_message(
@@ -44,31 +46,16 @@ async def process_task(bot, task: dict):
                 parse_mode='HTML'
             )
             return
-        
-        # Выполняем задачу в зависимости от типа
-        if task_type == 'generate':
-            result = await process_generate(bot, task)
-        elif task_type == 'edit':
-            result = await process_edit(bot, task)
-        elif task_type == 'stylize':
-            result = await process_stylize(bot, task)
-        elif task_type == 'reference':
-            result = await process_reference(bot, task)
-        elif task_type == 'transform':
-            result = await process_transform(bot, task)
-        elif task_type == 'remove_bg':
-            result = await process_remove_bg(bot, task)
-        elif task_type == 'upscale':
-            result = await process_upscale(bot, task)
-        elif task_type == 'banner':
-            result = await process_banner(bot, task)
-        else:
-            raise Exception(f"Unknown task type: {task_type}")
-        
-        # Списываем баланс
+
+        # Тяжёлая блокирующая генерация (requests к Segmind) выполняется в отдельном
+        # потоке, чтобы НЕ замораживать event loop бота на время запроса/таймаута.
+        result = await asyncio.to_thread(_execute_task, bot, task)
+
+        # Списываем баланс ТОЛЬКО после успешной генерации
         decrease_balance(user_id, cost)
+        charged = True
         new_balance = balance - cost
-        
+
         # Отправляем результат
         from utils.image_generation import get_model_display_name
         model_display = get_model_display_name(task['model']) if task['model'] else ""
@@ -141,13 +128,35 @@ async def process_task(bot, task: dict):
     except Exception as e:
         error_msg = str(e)
         logger.error(f"[TaskProcessor] Task {task_id} failed: {error_msg}")
+
+        # Если баланс успели списать — гарантированно возвращаем генерации
+        refunded = False
+        if charged:
+            try:
+                increase_balance(user_id, cost)
+                refunded = True
+                logger.info(f"[TaskProcessor] Refunded {cost} generations to user {user_id} (task {task_id})")
+            except Exception as refund_err:
+                logger.error(f"[TaskProcessor] REFUND FAILED for user {user_id} (task {task_id}): {refund_err}")
+
         mark_task_failed(task_id, error_msg)
-        
+
+        # Понятный пользователю текст ошибки + явное указание про генерации
+        user_error = getattr(e, 'user_message', None) or "😔 Сервис временно перегружен."
+        if refunded:
+            balance_note = "💎 Генерации возвращены на баланс."
+        elif not charged:
+            balance_note = "💎 Генерации за эту попытку не списаны."
+        else:
+            balance_note = "💎 Если генерации списались — напишите в поддержку, вернём."
+
         try:
             bot.send_message(
                 chat_id,
-                f"❌ <b>Ошибка генерации</b>\n\n{error_msg[:200]}\n\n"
-                f"Попробуйте ещё раз.",
+                f"❌ <b>Не удалось сгенерировать изображение</b>\n\n"
+                f"{user_error}\n\n"
+                f"{balance_note}\n"
+                f"Попробуйте ещё раз через минуту.",
                 parse_mode='HTML'
             )
         except:
@@ -156,7 +165,34 @@ async def process_task(bot, task: dict):
 
 # === НИЖЕ ИСПРАВЛЕННЫЕ ФУНКЦИИ ===
 
-async def process_generate(bot, task: dict):
+def _execute_task(bot, task: dict):
+    """
+    Синхронный диспетчер генерации. Выполняется в отдельном потоке
+    (asyncio.to_thread), поэтому блокирующие requests к Segmind не морозят бота.
+    """
+    task_type = task['task_type']
+
+    if task_type == 'generate':
+        return process_generate(bot, task)
+    elif task_type == 'edit':
+        return process_edit(bot, task)
+    elif task_type == 'stylize':
+        return process_stylize(bot, task)
+    elif task_type == 'reference':
+        return process_reference(bot, task)
+    elif task_type == 'transform':
+        return process_transform(bot, task)
+    elif task_type == 'remove_bg':
+        return process_remove_bg(bot, task)
+    elif task_type == 'upscale':
+        return process_upscale(bot, task)
+    elif task_type == 'banner':
+        return process_banner(bot, task)
+    else:
+        raise Exception(f"Unknown task type: {task_type}")
+
+
+def process_generate(bot, task: dict):
     """Генерация изображения"""
     from utils.image_generation import generate_image
     
@@ -174,7 +210,7 @@ async def process_generate(bot, task: dict):
     return image_buffer, url
 
 
-async def process_edit(bot, task: dict):
+def process_edit(bot, task: dict):
     """Редактирование изображения"""
     from utils.image_generation import edit_image
     
@@ -195,7 +231,7 @@ async def process_edit(bot, task: dict):
     return result_buffer, url
 
 
-async def process_stylize(bot, task: dict):
+def process_stylize(bot, task: dict):
     """Стилизация изображения"""
     from utils.image_tools import stylize_image
     
@@ -216,7 +252,7 @@ async def process_stylize(bot, task: dict):
     return result_buffer, url
 
 
-async def process_reference(bot, task: dict):
+def process_reference(bot, task: dict):
     """Генерация по референсу"""
     from utils.image_tools import generate_with_reference
     
@@ -237,7 +273,7 @@ async def process_reference(bot, task: dict):
     return result_buffer, url
 
 
-async def process_transform(bot, task: dict):
+def process_transform(bot, task: dict):
     """Трансформация по референсу"""
     from utils.image_tools import transform_with_reference
     
@@ -261,7 +297,7 @@ async def process_transform(bot, task: dict):
     return result_buffer, url
 
 
-async def process_remove_bg(bot, task: dict):
+def process_remove_bg(bot, task: dict):
     """Удаление фона"""
     from utils.image_tools import remove_background
     
@@ -278,7 +314,7 @@ async def process_remove_bg(bot, task: dict):
     return result_buffer, url
 
 
-async def process_upscale(bot, task: dict):
+def process_upscale(bot, task: dict):
     """Апскейл изображения"""
     from utils.image_tools import upscale_image
     
@@ -289,7 +325,7 @@ async def process_upscale(bot, task: dict):
     return upscale_image(image_bytes)
 
 
-async def process_banner(bot, task: dict):
+def process_banner(bot, task: dict):
     """Генерация баннера"""
     from utils.image_tools import generate_banner
     import json
@@ -310,11 +346,41 @@ async def process_banner(bot, task: dict):
     return result_buffer, url
 
 
+def _handle_interrupted_tasks(bot):
+    """
+    Обрабатывает задачи, прерванные перезапуском бота (статус 'processing').
+
+    Раньше они сбрасывались в 'pending' и генерировались ЗАНОВО — а значит
+    повторно тратили кредиты Segmind (картинка могла уже сгенерироваться до краша).
+    Теперь помечаем их как failed и просим пользователя повторить вручную.
+    Списания баланса в этот момент ещё не было (баланс списывается только
+    после успешной генерации), поэтому возврат не требуется.
+    """
+    from utils.task_queue import get_processing_tasks
+
+    interrupted = get_processing_tasks()
+    for task in interrupted:
+        try:
+            mark_task_failed(task['id'], "Прервано перезапуском сервиса")
+            bot.send_message(
+                task['chat_id'],
+                "⚠️ <b>Генерация прервана перезапуском сервиса</b>\n\n"
+                "💎 Генерации за неё не списаны.\n"
+                "Пожалуйста, отправьте запрос ещё раз.",
+                parse_mode='HTML'
+            )
+        except Exception as e:
+            logger.error(f"[TaskProcessor] Failed to handle interrupted task {task.get('id')}: {e}")
+
+    if interrupted:
+        logger.info(f"[TaskProcessor] Marked {len(interrupted)} interrupted task(s) as failed")
+
+
 async def task_processor_loop(bot):
     """Основной цикл обработки задач"""
     logger.info("[TaskProcessor] Starting task processor...")
-    reset_processing_to_pending()
-    
+    _handle_interrupted_tasks(bot)
+
     while True:
         try:
             tasks = get_pending_tasks(limit=5)

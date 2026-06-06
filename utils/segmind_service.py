@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 SEGMIND_API_KEY = os.getenv('SEGMIND_API_TOKEN')
 SEGMIND_BASE_URL = "https://api.segmind.com/v1"
 
+# Таймаут запроса к Segmind: (connect, read).
+# read=180с — если модель не ответила за 3 минуты, ждать дальше смысла нет,
+# лучше уйти в retry. Раньше стояло 300с, что при 3 попытках давало до 15 минут
+# зависания на одну задачу.
+SEGMIND_TIMEOUT = (10, 180)
+
 
 class SegmindError(Exception):
     """Ошибка Segmind API"""
@@ -325,11 +331,11 @@ def generate_image_segmind(prompt: str, aspect_ratio: str = "1:1", model: str = 
                 url,
                 headers=_get_headers(),
                 json=payload,
-                timeout=300
+                timeout=SEGMIND_TIMEOUT
             )
-            
+
             return _process_response(response)
-            
+
         except SegmindError:
             # Фатальные ошибки (нет денег, лимиты) выбрасываем сразу
             raise
@@ -337,9 +343,9 @@ def generate_image_segmind(prompt: str, aspect_ratio: str = "1:1", model: str = 
             # Ошибки сети, битый JSON, текст вместо картинки — повторяем
             last_error = e
             logger.warning(f"[Segmind] Attempt {attempt + 1}/{retries} failed: {e}")
-            
+
             if attempt < retries - 1:
-                time.sleep(2)
+                time.sleep(2 * (attempt + 1))  # экспоненциальная пауза: 2с, 4с, ...
     
     raise SegmindError(
         user_message="😔 Не удалось сгенерировать изображение после нескольких попыток.",
@@ -417,19 +423,19 @@ def edit_image_segmind(prompt: str, image_bytes: bytes, model: str = "google/nan
                 url,
                 headers=_get_headers(),
                 json=payload,
-                timeout=300 # Увеличенный таймаут
+                timeout=SEGMIND_TIMEOUT
             )
-            
+
             return _process_response(response)
-            
+
         except SegmindError:
             raise
         except Exception as e:
             last_error = e
             logger.warning(f"[Segmind] Edit attempt {attempt + 1}/{retries} failed: {e}")
-            
+
             if attempt < retries - 1:
-                time.sleep(2)
+                time.sleep(2 * (attempt + 1))  # экспоненциальная пауза: 2с, 4с, ...
     
     raise SegmindError(
         user_message="😔 Не удалось отредактировать изображение. Попробуйте позже.",
