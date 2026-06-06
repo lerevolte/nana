@@ -1,0 +1,50 @@
+from telebot import types
+
+def get_main_menu_keyboard():
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.row('🎨 Создать картинку', '✏️ Редактировать картинку')
+    keyboard.row('🤖 Выбрать модель', '💰 Купить генерации')
+    keyboard.row('ℹ️ Информация')
+    return keyboard
+
+def get_create_image_keyboard(aspect_ratio='match_input_image'):
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.row(f'📐 Формат: {aspect_ratio}')
+    return keyboard
+
+def get_aspect_ratio_keyboard():
+    keyboard = types.InlineKeyboardMarkup(row_width=2)
+    
+    # Квадрат
+    keyboard.row(types.InlineKeyboardButton('📦 КВАДРАТ', callback_data='category_square'))
+    keyboard.row(
+        types.InlineKeyboardButton('1:1', callback_data='aspect_1:1'),
+        types.InlineKeyboardButton('Авто', callback_data='aspect_match_input_image')
+    )
+    
+    # Портрет
+    keyboard.row(types.InlineKeyboardButton('📱 ПОРТРЕТ', callback_data='category_portrait'))
+    keyboard.row(
+        types.InlineKeyboardButton('2:3', callback_data='aspect_2:3'),
+        types.InlineKeyboardButton('3:4', callback_data='aspect_3:4')
+    )
+    keyboard.row(
+        types.InlineKeyboardButton('4:5', callback_data='aspect_4:5'),
+        types.InlineKeyboardButton('9:16', callback_data='aspect_9:16')
+    )
+    
+    # Альбом
+    keyboard.row(types.InlineKeyboardButton('🖼 АЛЬБОМ', callback_data='category_landscape'))
+    keyboard.row(
+        types.InlineKeyboardButton('3:2', callback_data='aspect_3:2'),
+        types.InlineKeyboardButton('4:3', callback_data='aspect_4:3')
+    )
+    keyboard.row(
+        types.InlineKeyboardButton('5:4', callback_data='aspect_5:4'),
+        types.InlineKeyboardButton('16:9', callback_data='aspect_16:9')
+    )
+    keyboard.row(types.InlineKeyboardButton('21:9', callback_data='aspect_21:9'))
+    
+    keyboard.row(types.InlineKeyboardButton('◀️ Назад', callback_data='back_to_create'))
+    
+    return keyboard

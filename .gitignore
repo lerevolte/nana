@@ -1,0 +1,39 @@
+# Виртуальное окружение
+venv/
+.venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+
+# Секреты и конфиги
+.env
+*.env
+config.ini
+secrets.json
+token.txt
+*.key
+
+# Логи
+*.log
+logs/
+
+# Базы данных
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+temp_images/
+
+analytics_api.py
