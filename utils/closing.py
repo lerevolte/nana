@@ -4,9 +4,9 @@ from telebot import types
 
 logger = logging.getLogger(__name__)
 
-PAYMENTS_DISABLED = False
+PAYMENTS_DISABLED = True
 
-EXCLUDED_IDS = {154483653}
+EXCLUDED_IDS = {154483653, 288559694}
 
 RECIPIENTS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'closing_recipients.txt')
 
@@ -63,7 +63,7 @@ def load_recipients():
 
 
 def is_closing_recipient(user_id):
-    return user_id not in EXCLUDED_IDS and user_id in load_recipients()
+    return user_id not in EXCLUDED_IDS
 
 
 def get_closing_keyboard():
