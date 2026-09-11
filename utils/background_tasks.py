@@ -2,7 +2,6 @@ import asyncio
 import logging
 from utils.db_utils import get_pending_payments, update_payment_status, increase_balance, get_balance
 from utils.yookassa_service import check_payment
-from utils.daily_scheduler import daily_generation_task
 from utils.yandex_api import metrica
 from utils.task_processor import task_processor_loop
 
@@ -152,7 +151,6 @@ def start_background_tasks(bot):
         
         # Запускаем обе задачи параллельно
         loop.create_task(check_payments_loop(bot))
-        loop.create_task(daily_generation_task())
         loop.create_task(cleanup_images_loop())
         loop.create_task(task_processor_loop(bot))
         #loop.create_task(cleanup_states_loop())
@@ -161,7 +159,7 @@ def start_background_tasks(bot):
     
     thread = threading.Thread(target=run_async_loop, daemon=True)
     thread.start()
-    logger.info("Background tasks started (payments + daily generations)")
+    logger.info("Background tasks started")
 
 
 async def cleanup_images_loop():
