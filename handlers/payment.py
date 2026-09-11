@@ -4,6 +4,7 @@ from utils.db_utils import get_balance, create_payment, update_user_contact, get
 from utils.yookassa_service import create_payment as create_yookassa_payment
 from telebot import types
 import os
+from utils.closing import PAYMENTS_DISABLED, payments_closed_message
 
 PACKAGES = {
     'buy_7_150': {'generations': 7, 'price': 150},
@@ -28,7 +29,13 @@ def register_handlers(bot):
         
         package = PACKAGES[package_key]
         user_id = call.from_user.id
-        
+
+        if PAYMENTS_DISABLED:
+            text, keyboard = payments_closed_message(user_id)
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=keyboard, parse_mode='HTML')
+            bot.answer_callback_query(call.id)
+            return
+
         user = get_or_create_user(user_id, call.from_user.username, call.from_user.first_name)
         saved_contact = user.get('contact')
         

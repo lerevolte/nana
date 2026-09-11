@@ -4,6 +4,7 @@ from keyboards.reply import (
 )
 from keyboards.info import get_info_keyboard
 from keyboards.payment import get_buy_keyboard
+from utils.closing import PAYMENTS_DISABLED, payments_closed_message
 from keyboards.inline import get_model_selection_keyboard, get_models_info
 from utils.db_utils import get_user_model, get_balance
 from utils.image_generation import get_model_display_name
@@ -99,6 +100,11 @@ def register_handlers(bot):
     @bot.callback_query_handler(func=lambda call: call.data == 'menu_buy')
     def menu_buy_callback(call):
         """Покупка генераций"""
+        if PAYMENTS_DISABLED:
+            text, keyboard = payments_closed_message(call.from_user.id)
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=keyboard, parse_mode='HTML')
+            bot.answer_callback_query(call.id)
+            return
         first_name = call.from_user.first_name or 'Пользователь'
         
         buy_message = (

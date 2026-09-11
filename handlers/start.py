@@ -1,6 +1,7 @@
 from keyboards.reply import get_main_menu_keyboard, get_create_image_keyboard, get_edit_image_keyboard
 from keyboards.info import get_info_keyboard
 from keyboards.payment import get_buy_keyboard
+from utils.closing import PAYMENTS_DISABLED, payments_closed_message
 from keyboards.inline import get_model_selection_keyboard, get_models_info
 from utils.db_utils import (
     get_or_create_user, get_user_by_referral_code, add_referral,
@@ -334,6 +335,10 @@ def register_handlers(bot):
     
     @bot.message_handler(commands=['buy'])
     def buy_command(message):
+        if PAYMENTS_DISABLED:
+            text, keyboard = payments_closed_message(message.from_user.id)
+            bot.send_message(message.chat.id, text, reply_markup=keyboard, parse_mode='HTML')
+            return
         first_name = message.from_user.first_name or 'Пользователь'
         
         buy_message = (

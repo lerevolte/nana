@@ -60,7 +60,11 @@ def create_payment(user_id: int, generations_count: int, user_contact: str = Non
     user_contact: Email или телефон от пользователя.
     """
     logger.info(f"Creating payment for user {user_id}, contact: {user_contact}")
-    
+
+    from utils.closing import PAYMENTS_DISABLED
+    if PAYMENTS_DISABLED:
+        return {"success": False, "error": "Покупка генераций больше недоступна"}
+
     if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
         return {"success": False, "error": "ЮKassa не настроена"}
     

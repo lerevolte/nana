@@ -1,5 +1,6 @@
 from keyboards.info import get_info_keyboard
 from keyboards.payment import get_buy_keyboard
+from utils.closing import PAYMENTS_DISABLED, payments_closed_message
 from keyboards.reply import get_main_menu_keyboard
 from utils.db_utils import get_balance, get_or_set_referral_code, get_referral_stats
 from telebot import types
@@ -38,6 +39,11 @@ def register_handlers(bot):
     @bot.callback_query_handler(func=lambda call: call.data == 'info_buy')
     def info_buy_callback(call):
         """Покупка из раздела информации"""
+        if PAYMENTS_DISABLED:
+            text, keyboard = payments_closed_message(call.from_user.id)
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=keyboard, parse_mode='HTML')
+            bot.answer_callback_query(call.id)
+            return
         first_name = call.from_user.first_name or 'Пользователь'
         
         buy_message = (

@@ -40,11 +40,12 @@ set_bot_commands()
 # Регистрируем обработчики
 from handlers import (
     start, create_image, callbacks, menu, model_selection, 
-    payment, info, common, main_menu, edit_image, admin, tools, promo
+    payment, info, common, main_menu, edit_image, admin, tools, promo, closing_admin
 )
 
 common.register_handlers(bot)
 admin.register_handlers(bot)
+closing_admin.register_handlers(bot)
 start.register_handlers(bot)
 promo.register_handlers(bot)
 tools.register_handlers(bot)  # Инструменты перед edit_image

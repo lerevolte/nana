@@ -13,6 +13,7 @@ from utils.task_queue import (
 )
 from utils.db_utils import get_balance, decrease_balance, increase_balance
 from utils.constants import BOT_SIGNATURE
+from utils.closing import send_closing_notice
 from utils.image_hosting import upload_image  # <--- Добавлен импорт
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,8 @@ async def process_task(bot, task: dict):
             f"💎 Осталось генераций: {new_balance}",
             parse_mode='HTML'
         )
-        
+        send_closing_notice(bot, chat_id, task['user_id'])
+
         logger.info(f"[TaskProcessor] Task {task_id} completed successfully")
         
     except Exception as e:

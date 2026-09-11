@@ -2,6 +2,7 @@ from keyboards.reply import get_main_menu_keyboard, get_edit_image_keyboard, get
 from utils.db_utils import get_user_model, get_balance, decrease_balance
 from utils.image_generation import get_model_display_name, edit_image
 from utils.constants import BOT_SIGNATURE
+from utils.closing import PAYMENTS_DISABLED
 
 # Словарь для хранения состояния и изображений пользователя
 edit_states = {}
@@ -178,7 +179,7 @@ def register_handlers(bot):
                 f'❌ <b>Недостаточно генераций!</b>\n\n'
                 f'Для этой модели нужно: {cost} генераций\n'
                 f'Ваш баланс: {balance} генераций\n\n'
-                f'Используйте кнопку «💰 Купить» для пополнения баланса.',
+                (f'Покупка генераций в этом боте больше недоступна.' if PAYMENTS_DISABLED else f'Используйте кнопку «💰 Купить» для пополнения баланса.'),
                 reply_markup=get_main_menu_keyboard(),
                 parse_mode='HTML'
             )

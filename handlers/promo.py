@@ -2,6 +2,7 @@ from telebot import types
 from utils.db_utils import use_promo_code, get_balance
 from keyboards.reply import get_main_menu_keyboard
 from utils.state_manager import StateDict, StateDataDict
+from utils.closing import PAYMENTS_DISABLED, payments_closed_message
 
 # Используем персистентные состояния
 promo_states = StateDict('promo')
@@ -89,7 +90,15 @@ def register_handlers(bot):
     def buy_with_promo_callback(call):
         """Покупка со скидкой по промокоду"""
         user_id = call.from_user.id
-        
+
+        if PAYMENTS_DISABLED:
+            if user_id in user_discount_promos:
+                del user_discount_promos[user_id]
+            text, keyboard = payments_closed_message(user_id)
+            bot.edit_message_text(text, call.message.chat.id, call.message.message_id, reply_markup=keyboard, parse_mode='HTML')
+            bot.answer_callback_query(call.id)
+            return
+
         if user_id not in user_discount_promos:
             bot.answer_callback_query(call.id, "❌ Скидка истекла, введите промокод заново")
             return
@@ -182,7 +191,16 @@ def register_handlers(bot):
         
         user_id = message.from_user.id
         contact = message.text.strip()
-        
+
+        if PAYMENTS_DISABLED:
+            if user_id in user_discount_promos:
+                del user_discount_promos[user_id]
+            if user_id in promo_states:
+                del promo_states[user_id]
+            text, keyboard = payments_closed_message(user_id)
+            bot.send_message(message.chat.id, text, reply_markup=keyboard, parse_mode='HTML')
+            return
+
         if user_id not in user_discount_promos:
             bot.send_message(message.chat.id, "❌ Скидка истекла, введите промокод заново")
             if user_id in promo_states:
