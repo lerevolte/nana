@@ -4,7 +4,9 @@ from telebot import types
 
 logger = logging.getLogger(__name__)
 
-PAYMENTS_DISABLED = True
+PAYMENTS_DISABLED = False
+
+CLOSING_NOTICE_ENABLED = False
 
 EXCLUDED_IDS = {154483653, 288559694, 378775277}
 
@@ -63,7 +65,7 @@ def load_recipients():
 
 
 def is_closing_recipient(user_id):
-    return user_id not in EXCLUDED_IDS
+    return CLOSING_NOTICE_ENABLED and user_id not in EXCLUDED_IDS
 
 
 def get_closing_keyboard():
