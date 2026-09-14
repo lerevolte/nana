@@ -8,7 +8,7 @@ PAYMENTS_DISABLED = True
 
 CLOSING_NOTICE_ENABLED = True
 
-EXCLUDED_IDS = {154483653, 288559694, 378775277}
+EXCLUDED_IDS = {154483653, 288559694, 378775277, 6231501485}
 
 RECIPIENTS_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'closing_recipients.txt')
 
