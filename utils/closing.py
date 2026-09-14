@@ -4,9 +4,9 @@ from telebot import types
 
 logger = logging.getLogger(__name__)
 
-PAYMENTS_DISABLED = False
+PAYMENTS_DISABLED = True
 
-CLOSING_NOTICE_ENABLED = False
+CLOSING_NOTICE_ENABLED = True
 
 EXCLUDED_IDS = {154483653, 288559694, 378775277}
 
