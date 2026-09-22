@@ -1,4 +1,5 @@
 from config.database import get_connection
+from utils.closing import FREE_CREDITS_DISABLED
 import hashlib
 import time
 from typing import Optional
@@ -17,8 +18,8 @@ def get_or_create_user(user_id, username, first_name, utm_source=None, utm_mediu
             cursor.execute(
                 '''INSERT INTO users (id, username, first_name, generations_balance, has_received_welcome_bonus,
                    selected_aspect_ratio, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ym_client_id) 
-                   VALUES (%s, %s, %s, 1, TRUE, '1:1', %s, %s, %s, %s, %s, %s)''',
-                (user_id, username, first_name, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ym_client_id)
+                   VALUES (%s, %s, %s, %s, TRUE, '1:1', %s, %s, %s, %s, %s, %s)''',
+                (user_id, username, first_name, 0 if FREE_CREDITS_DISABLED else 1, utm_source, utm_medium, utm_campaign, utm_content, utm_term, ym_client_id)
             )
             conn.commit()
             
@@ -26,7 +27,7 @@ def get_or_create_user(user_id, username, first_name, utm_source=None, utm_mediu
                 'id': user_id,
                 'username': username,
                 'first_name': first_name,
-                'generations_balance': 1,
+                'generations_balance': 0 if FREE_CREDITS_DISABLED else 1,
                 'selected_model': 'google/nano-banana',
                 'selected_aspect_ratio': '1:1',
                 'has_received_welcome_bonus': True,
@@ -289,11 +290,11 @@ def add_referral(referrer_id, referred_id):
         # Обновляем referred_by у приглашённого
         cursor.execute('UPDATE users SET referred_by = %s WHERE id = %s', (referrer_id, referred_id))
         
-        # Начисляем бонус рефереру (3 генерации)
-        cursor.execute(
-            'UPDATE users SET generations_balance = generations_balance + 3 WHERE id = %s',
-            (referrer_id,)
-        )
+        if not FREE_CREDITS_DISABLED:
+            cursor.execute(
+                'UPDATE users SET generations_balance = generations_balance + 3 WHERE id = %s',
+                (referrer_id,)
+            )
         
         conn.commit()
         cursor.close()
@@ -439,7 +440,7 @@ def use_promo_code(user_id, code):
         )
         promo = cursor.fetchone()
         
-        if not promo:
+        if not promo or (FREE_CREDITS_DISABLED and promo['type'] == 'free'):
             cursor.close()
             conn.close()
             return {'success': False, 'error': 'not_found'}
@@ -565,7 +566,11 @@ def check_and_reward_referrer(user_id, reward_generations=5):
         
         referrer_id = result['referrer_id']
         
-        # Начисляем награду рефереру
+        if FREE_CREDITS_DISABLED:
+            cursor.close()
+            conn.close()
+            return None
+        
         cursor.execute(
             'UPDATE users SET generations_balance = generations_balance + %s WHERE id = %s',
             (reward_generations, referrer_id)

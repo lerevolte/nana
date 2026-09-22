@@ -1,7 +1,7 @@
 from keyboards.reply import get_main_menu_keyboard, get_create_image_keyboard, get_edit_image_keyboard
 from keyboards.info import get_info_keyboard
 from keyboards.payment import get_buy_keyboard
-from utils.closing import PAYMENTS_DISABLED, payments_closed_message
+from utils.closing import PAYMENTS_DISABLED, FREE_CREDITS_DISABLED, payments_closed_message
 from keyboards.inline import get_model_selection_keyboard, get_models_info
 from utils.db_utils import (
     get_or_create_user, get_user_by_referral_code, add_referral,
@@ -182,7 +182,7 @@ def register_handlers(bot):
                 referrer_id = get_user_by_referral_code(referral_code)
                 
                 if referrer_id and referrer_id != user_id:
-                    if add_referral(referrer_id, user_id):
+                    if add_referral(referrer_id, user_id) and not FREE_CREDITS_DISABLED:
                         referral_bonus_message = "\n🎉 Вы пришли по реферальной ссылке! Вашему другу начислено 3 генерации!"
                         
                         try:
@@ -201,9 +201,8 @@ def register_handlers(bot):
             
             welcome_message = (
                 f"🎉 <b>Добро пожаловать в Не да Винчи!</b>\n\n"
-                f"🎁 Твой приветственный бонус: 1 генерация\n"
-                f"{referral_bonus_message}\n\n"
-                f"💎 Текущий баланс: <b>{user['generations_balance']}</b> генераций\n\n"
+                + (f"🎁 Твой приветственный бонус: 1 генерация\n{referral_bonus_message}\n\n" if not FREE_CREDITS_DISABLED else "")
+                + f"💎 Текущий баланс: <b>{user['generations_balance']}</b> генераций\n\n"
                 f"Выберите действие:"
             )
             
